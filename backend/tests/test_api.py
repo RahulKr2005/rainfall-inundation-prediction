@@ -143,3 +143,38 @@ def test_forecast_dynamic_coordinates():
     assert "current_weather" in data["data_classification"]
 
 
+def test_literal_enum_validation():
+    # 1. Valid horizons: 6, 12, 24
+    for h in [6, 12, 24]:
+        r_fc = client.get(f"/api/forecast?horizon={h}")
+        assert r_fc.status_code == 200
+        r_map = client.get(f"/api/map/layers?horizon={h}")
+        assert r_map.status_code == 200
+        r_rep = client.get(f"/api/report/export?horizon={h}&format=json")
+        assert r_rep.status_code == 200
+
+    # 2. Invalid horizon (e.g., 48) should be rejected with 422 Unprocessable Entity
+    r_bad_h = client.get("/api/forecast?horizon=48")
+    assert r_bad_h.status_code == 422
+
+    # 3. Valid report formats: json, markdown
+    r_md = client.get("/api/report/export?horizon=24&format=markdown")
+    assert r_md.status_code == 200
+    assert "bulletin_markdown" in r_md.json()
+
+    # 4. Invalid report format should be rejected with 422
+    r_bad_fmt = client.get("/api/report/export?horizon=24&format=pdf")
+    assert r_bad_fmt.status_code == 422
+
+
+def test_root_endpoints():
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+    assert "documentation" in res_root.json()
+
+    res_health = client.get("/health")
+    assert res_health.status_code == 200
+    assert res_health.json()["status"] == "healthy"
+
+
+

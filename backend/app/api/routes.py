@@ -11,10 +11,21 @@ Exposes endpoints for:
 """
 
 from fastapi import APIRouter, Query, UploadFile, File, Form, HTTPException
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal, Annotated
+from pydantic import BeforeValidator
 from datetime import datetime, timezone
 import json
 import numpy as np
+
+
+def _coerce_int(v: Any) -> Any:
+    try:
+        return int(v)
+    except Exception:
+        return v
+
+
+ForecastHorizon = Annotated[Literal[6, 12, 24], BeforeValidator(_coerce_int)]
 
 from app.config import DEFAULT_STUDY_AREA, IMD_RAINFALL_THRESHOLDS, get_rainfall_category
 from app.data.catalog import OFFICIAL_DATASETS, populate_catalog_db
@@ -131,7 +142,7 @@ def get_health() -> Dict[str, Any]:
 
 @router.get("/forecast")
 def get_forecast(
-    horizon: int = Query(24, enum=[6, 12, 24]),
+    horizon: Annotated[Literal[6, 12, 24], BeforeValidator(_coerce_int), Query()] = 24,
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
     location_name: Optional[str] = Query(None)
@@ -220,7 +231,9 @@ def get_station_observations() -> Dict[str, Any]:
 
 
 @router.get("/map/layers")
-def get_map_layers(horizon: int = Query(24, enum=[6, 12, 24])) -> Dict[str, Any]:
+def get_map_layers(
+    horizon: Annotated[Literal[6, 12, 24], BeforeValidator(_coerce_int), Query()] = 24
+) -> Dict[str, Any]:
     """Return geospatial layers formatted for Leaflet visualization."""
     pipeline = get_pipeline()
     spatial = pipeline.get_static_spatial_layers()
@@ -394,7 +407,10 @@ async def upload_local_dataset(
 
 
 @router.get("/report/export")
-def export_bulletin(horizon: int = Query(24, enum=[6, 12, 24]), format: str = Query("markdown", enum=["markdown", "json"])) -> Any:
+def export_bulletin(
+    horizon: Annotated[Literal[6, 12, 24], BeforeValidator(_coerce_int), Query()] = 24,
+    format: Literal["markdown", "json"] = Query("markdown")
+) -> Any:
     """Generate downloadable research bulletin."""
     pipeline = get_pipeline()
     features_meta = pipeline.extract_rainfall_features(horizon_hours=horizon)
